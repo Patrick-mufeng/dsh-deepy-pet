@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build scratch
+*.log
+_t*.cjs
+_*.cjs
+
+# Editor and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Screenshots taken while checking the UI
+docs/*.tmp.*
