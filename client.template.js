@@ -538,8 +538,15 @@ window.__ModuleLoader__.load({
 
       function frameOffset(sheet, frame) {
         const [cellWidth, cellHeight] = cellOf(sheet);
-        return 'translate(' + (-(frame % 8) * cellWidth * scale) + 'px, ' +
-          (-Math.floor(frame / 8) * cellHeight * scale) + 'px)';
+        /*
+         * Round the translation to a whole pixel. The sheet is drawn at
+         * `scale` device pixels per logical pixel, so an odd column lands on a
+         * half pixel once `scale` is fractional; rounding keeps every frame on
+         * the pixel grid instead of letting the browser resample the sprite as
+         * the animation steps, which is what makes a still pose shimmer.
+         */
+        return 'translate(' + Math.round(-(frame % 8) * cellWidth * scale) + 'px, ' +
+          Math.round(-Math.floor(frame / 8) * cellHeight * scale) + 'px)';
       }
 
       function play(key, mode) {
@@ -599,19 +606,24 @@ window.__ModuleLoader__.load({
         const [cellWidth, cellHeight] = cellOf(sheet);
         const rows = Math.ceil(sheet.frames / 8);
         root.style.backgroundImage = 'none';
-        sprite.style.left = (sheet.box[0] * scale) + 'px';
-        sprite.style.top = (sheet.box[1] * scale) + 'px';
-        sprite.style.width = (sheet.box[2] * scale) + 'px';
-        sprite.style.height = (sheet.box[3] * scale) + 'px';
-        strip.style.width = (cellWidth * 8 * scale) + 'px';
-        strip.style.height = (rows * cellHeight * scale) + 'px';
+        /*
+         * Every edge here is a whole pixel. A fractional crop window would let
+         * the browser resample the sheet, which softens the pixel art and lets
+         * the sprite's edge drift between repaints.
+         */
+        sprite.style.left = Math.round(sheet.box[0] * scale) + 'px';
+        sprite.style.top = Math.round(sheet.box[1] * scale) + 'px';
+        sprite.style.width = Math.round(sheet.box[2] * scale) + 'px';
+        sprite.style.height = Math.round(sheet.box[3] * scale) + 'px';
+        strip.style.width = Math.round(cellWidth * 8 * scale) + 'px';
+        strip.style.height = Math.round(rows * cellHeight * scale) + 'px';
         strip.style.backgroundImage = 'url("' + SHEET_DATA[key] + '")';
-        strip.style.backgroundSize = (cellWidth * 8 * scale) + 'px auto';
+        strip.style.backgroundSize = Math.round(cellWidth * 8 * scale) + 'px auto';
         if (hit !== null) {
-          hit.style.left = (sheet.box[0] * scale) + 'px';
-          hit.style.top = (sheet.box[1] * scale) + 'px';
-          hit.style.width = (sheet.box[2] * scale) + 'px';
-          hit.style.height = (sheet.box[3] * scale) + 'px';
+          hit.style.left = Math.round(sheet.box[0] * scale) + 'px';
+          hit.style.top = Math.round(sheet.box[1] * scale) + 'px';
+          hit.style.width = Math.round(sheet.box[2] * scale) + 'px';
+          hit.style.height = Math.round(sheet.box[3] * scale) + 'px';
         }
         current = { key, mode };
         root.dataset.animation = key;
@@ -1249,8 +1261,15 @@ window.__ModuleLoader__.load({
         key: 'box',
         style: {
           position: 'absolute',
-          /* Sit inside the composer card's width, mirroring the card's own side
-             clearance when the host publishes it, and never at the window edge. */
+          /*
+           * Sit inside the composer card's width, mirroring the card's own side
+           * clearance when the host publishes it, and never at the window edge.
+           *
+           * The inset is composed from an integer offset plus the card's own
+           * centring term. `translateZ(0)` below keeps the box on its own
+           * composited layer, so repainting the sprite cannot resnap it to a
+           * different subpixel position and make an edge flicker.
+           */
           right: 'calc(max(16px, (100% - var(--dsh-composer-card-max-width, 100%)) / 2) + ' + config.offset + 'px)',
           /*
            * The anchor's bottom edge is the composer card's top edge. Each crop
@@ -1260,8 +1279,10 @@ window.__ModuleLoader__.load({
            * `lift` lets the reader nudge it when a host adds padding of its own.
            */
           bottom: config.lift + 'px',
-          width: (GRID * scale) + 'px',
-          height: (GRID * scale) + 'px',
+          /* Integer box: a fractional width would give the sprite a half-pixel edge. */
+          width: Math.round(GRID * scale) + 'px',
+          height: Math.round(GRID * scale) + 'px',
+          transform: 'translateZ(0)',
         },
       }, [
         h('span', {
@@ -1740,7 +1761,8 @@ window.__ModuleLoader__.load({
               note: config.size + 'px',
               min: 60,
               max: 220,
-              step: 2,
+              /* Multiples of 4 keep 52 * scale near an integer, so cells stay crisp. */
+              step: 4,
               value: config.size,
               onChange: (value) => runtime.set({ size: value }),
             }),
