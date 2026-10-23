@@ -558,14 +558,14 @@ window.__ModuleLoader__.load({
       function frameOffset(sheet, frame) {
         const [cellWidth, cellHeight] = cellOf(sheet);
         /*
-         * Round the translation to a whole pixel. The sheet is drawn at
-         * `scale` device pixels per logical pixel, so an odd column lands on a
-         * half pixel once `scale` is fractional; rounding keeps every frame on
-         * the pixel grid instead of letting the browser resample the sprite as
-         * the animation steps, which is what makes a still pose shimmer.
+         * Floor the translation, never round it. The sheet is drawn at `scale`
+         * device pixels per logical pixel, so a cell edge usually falls
+         * mid-pixel; rounding can push the strip a pixel further than the cell
+         * being shown and reveal the next cell along. Flooring keeps the window
+         * aligned with, never past, the cell it must cover.
          */
-        return 'translate(' + Math.round(-(frame % 8) * cellWidth * scale) + 'px, ' +
-          Math.round(-Math.floor(frame / 8) * cellHeight * scale) + 'px)';
+        return 'translate(' + Math.floor(-(frame % 8) * cellWidth * scale) + 'px, ' +
+          Math.floor(-Math.floor(frame / 8) * cellHeight * scale) + 'px)';
       }
 
       function play(key, mode) {
@@ -618,6 +618,14 @@ window.__ModuleLoader__.load({
        * Paint one animation: crop window and strip geometry. Only the strip
        * carries the sheet — the sprite is a clipping window and the root is a
        * plain box, so exactly one whale is ever drawn.
+       *
+       * The window is `floor`ed, never rounded. A cell is `box * scale` device
+       * pixels wide, which is fractional for most sizes; rounding it up makes
+       * the window a fraction taller or wider than the cell it must cover, and
+       * the strip is a continuous image, so that sliver paints the neighbouring
+       * cell's edge — a hairline of stray pixels along one side of the whale
+       * that changes as the frames step. Flooring keeps the window inside the
+       * cell. The offset is floored too, so the two never add up past it.
        */
       function show(key, mode) {
         const sheet = SHEETS[key];
@@ -625,24 +633,19 @@ window.__ModuleLoader__.load({
         const [cellWidth, cellHeight] = cellOf(sheet);
         const rows = Math.ceil(sheet.frames / 8);
         root.style.backgroundImage = 'none';
-        /*
-         * Every edge here is a whole pixel. A fractional crop window would let
-         * the browser resample the sheet, which softens the pixel art and lets
-         * the sprite's edge drift between repaints.
-         */
-        sprite.style.left = Math.round(sheet.box[0] * scale) + 'px';
-        sprite.style.top = Math.round(sheet.box[1] * scale) + 'px';
-        sprite.style.width = Math.round(sheet.box[2] * scale) + 'px';
-        sprite.style.height = Math.round(sheet.box[3] * scale) + 'px';
-        strip.style.width = Math.round(cellWidth * 8 * scale) + 'px';
-        strip.style.height = Math.round(rows * cellHeight * scale) + 'px';
+        sprite.style.left = Math.floor(sheet.box[0] * scale) + 'px';
+        sprite.style.top = Math.floor(sheet.box[1] * scale) + 'px';
+        sprite.style.width = Math.floor(sheet.box[2] * scale) + 'px';
+        sprite.style.height = Math.floor(sheet.box[3] * scale) + 'px';
+        strip.style.width = Math.floor(cellWidth * 8 * scale) + 'px';
+        strip.style.height = Math.floor(rows * cellHeight * scale) + 'px';
         strip.style.backgroundImage = 'url("' + SHEET_DATA[key] + '")';
-        strip.style.backgroundSize = Math.round(cellWidth * 8 * scale) + 'px auto';
+        strip.style.backgroundSize = Math.floor(cellWidth * 8 * scale) + 'px auto';
         if (hit !== null) {
-          hit.style.left = Math.round(sheet.box[0] * scale) + 'px';
-          hit.style.top = Math.round(sheet.box[1] * scale) + 'px';
-          hit.style.width = Math.round(sheet.box[2] * scale) + 'px';
-          hit.style.height = Math.round(sheet.box[3] * scale) + 'px';
+          hit.style.left = Math.floor(sheet.box[0] * scale) + 'px';
+          hit.style.top = Math.floor(sheet.box[1] * scale) + 'px';
+          hit.style.width = Math.floor(sheet.box[2] * scale) + 'px';
+          hit.style.height = Math.floor(sheet.box[3] * scale) + 'px';
         }
         current = { key, mode };
         root.dataset.animation = key;
